@@ -4,15 +4,15 @@
 
 A minimal RAG pipeline:
 
-**docs → chunk → embed → store → retrieve top-k → generate answer + citations**
+**docs → chunk → embed → store → hybrid retrieve top-k → generate answer + citations**
 
-No hybrid search, no rerank, no query rewrite. Those come in later projects.
+(Lite hybrid added as a hotfix for exact codes like `E_4022`. Full metadata/version filters stay in Project 2.)
 
 ## What success looks like
 
 Ask a question about our docs → get an answer grounded in retrieved chunks → see which chunk IDs were used.
 
-## Pipeline (naive)
+## Pipeline (naive + lite hybrid)
 
 ```
 [docs/*.md]
@@ -20,9 +20,9 @@ Ask a question about our docs → get an answer grounded in retrieved chunks →
     → chunk (DECISION 1)
     → embed (local or API embedding model)
     → vector store (local, e.g. Chroma)
-    → on query: embed(query) → top-k chunks
+    → on query: dense top-N + keyword ranks → RRF fuse → top-k
     → pack into prompt
-    → LLM generates answer + cites chunk ids
+    → LLM generates answer + Sources list
 ```
 
 ## Design decisions
@@ -67,9 +67,18 @@ Answer text first, then a **Sources:** block listing `chunk_id` + heading (no in
   (`{"region":"us-east-1","model_id":"amazon.nova-lite-v1:0"}`)
 - Auth: AWS CLI / default credential chain (no API keys in the repo)
 
+## Hotfix — lite hybrid retrieve (exact codes)
+
+Pure vector search missed `E_4022`. Fix in `retrieve.py`:
+
+1. **Dense:** Chroma top-10 by embedding similarity  
+2. **Keyword:** rank chunks by exact token overlap (boost tokens with digits/`_`)  
+3. **RRF fuse** → final **k=3**
+
+Project 2 still adds metadata filters / versions and a fuller hybrid story.
+
 ## Out of scope (on purpose)
 
-- Metadata filters / versions
-- Hybrid (BM25 + vector)
-- Rerank / query rewrite
+- Metadata filters / versions (Project 2)
+- Rerank / query rewrite (Project 3)
 - Fancy UI
